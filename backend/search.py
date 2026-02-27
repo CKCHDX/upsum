@@ -1,16 +1,18 @@
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
-import wikipediaapi
+import requests
 import re
 from typing import List, Dict
 
 router = APIRouter()
 
-# Initialize Swedish Wikipedia API
-wiki = wikipediaapi.Wikipedia(
-    language='sv',
-    user_agent='Upsum/0.1 (https://oscyra.solutions/upsum; alex@oscyra.solutions)'
-)
+# Swedish Wikipedia API endpoint
+WIKI_API = "https://sv.wikipedia.org/w/api.php"
+
+def clean_html(text: str) -> str:
+    """Remove HTML tags from text."""
+    clean = re.sub(r'<[^>]+>', '', text)
+    return clean.strip()
 
 def clean_snippet(text: str, max_length: int = 200) -> str:
     """Clean and truncate text for snippet display."""
@@ -25,7 +27,7 @@ def clean_snippet(text: str, max_length: int = 200) -> str:
 
 def search_wikipedia(query: str, limit: int = 10) -> List[Dict[str, str]]:
     """
-    Search Swedish Wikipedia and return formatted results.
+    Search Swedish Wikipedia using MediaWiki API.
     
     Args:
         query: Search query in Swedish
@@ -37,58 +39,66 @@ def search_wikipedia(query: str, limit: int = 10) -> List[Dict[str, str]]:
     results = []
     
     try:
-        # Get the main page for exact match
-        page = wiki.page(query)
-        
-        if page.exists():
-            results.append({
-                'title': page.title,
-                'snippet': clean_snippet(page.summary),
-                'url': page.fullurl
-            })
-        
-        # Search for related pages
-        import requests
-        search_url = f"https://sv.wikipedia.org/w/api.php"
+        # First, try to get page extracts using the search API
         params = {
-            'action': 'opensearch',
-            'search': query,
-            'limit': limit,
-            'namespace': 0,
-            'format': 'json'
+            'action': 'query',
+            'format': 'json',
+            'list': 'search',
+            'srsearch': query,
+            'srlimit': limit,
+            'srprop': 'snippet',
+            'utf8': 1
         }
         
-        response = requests.get(search_url, params=params, timeout=5)
+        response = requests.get(WIKI_API, params=params, timeout=10)
         
         if response.status_code == 200:
             data = response.json()
-            titles = data[1] if len(data) > 1 else []
-            descriptions = data[2] if len(data) > 2 else []
-            urls = data[3] if len(data) > 3 else []
+            search_results = data.get('query', {}).get('search', [])
             
-            # Add search results (skip duplicates)
-            seen_titles = {r['title'] for r in results}
+            for result in search_results:
+                title = result.get('title', '')
+                snippet = clean_html(result.get('snippet', 'Läs mer på Wikipedia'))
+                
+                # Construct Wikipedia URL
+                url = f"https://sv.wikipedia.org/wiki/{title.replace(' ', '_')}"
+                
+                results.append({
+                    'title': title,
+                    'snippet': clean_snippet(snippet),
+                    'url': url
+                })
+        
+        # If no results, try opensearch API as fallback
+        if not results:
+            opensearch_params = {
+                'action': 'opensearch',
+                'search': query,
+                'limit': limit,
+                'namespace': 0,
+                'format': 'json'
+            }
             
-            for i, title in enumerate(titles):
-                if title not in seen_titles and len(results) < limit:
-                    snippet = descriptions[i] if i < len(descriptions) else ''
-                    
-                    # If no description, try to get page summary
-                    if not snippet:
-                        try:
-                            article = wiki.page(title)
-                            if article.exists():
-                                snippet = clean_snippet(article.summary)
-                        except:
-                            snippet = 'Artikel tillgänglig på Wikipedia'
+            response = requests.get(WIKI_API, params=opensearch_params, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                titles = data[1] if len(data) > 1 else []
+                descriptions = data[2] if len(data) > 2 else []
+                urls = data[3] if len(data) > 3 else []
+                
+                for i, title in enumerate(titles):
+                    snippet = descriptions[i] if i < len(descriptions) and descriptions[i] else 'Läs mer på Wikipedia'
+                    url = urls[i] if i < len(urls) else f"https://sv.wikipedia.org/wiki/{title.replace(' ', '_')}"
                     
                     results.append({
                         'title': title,
-                        'snippet': snippet or 'Läs mer på Wikipedia',
-                        'url': urls[i] if i < len(urls) else f"https://sv.wikipedia.org/wiki/{title.replace(' ', '_')}"
+                        'snippet': clean_snippet(snippet),
+                        'url': url
                     })
-                    seen_titles.add(title)
         
+    except requests.RequestException as e:
+        print(f"Wikipedia API error: {e}")
     except Exception as e:
         print(f"Search error: {e}")
     
