@@ -186,8 +186,15 @@
       border-color: #384656;
     }
 
+    .result-link {
+      text-decoration: none;
+      color: inherit;
+      display: block;
+    }
+
     .result-title {
       font-size: 13px;
+      color: var(--accent);
     }
 
     .result-snippet {
@@ -278,12 +285,20 @@
         const li = document.createElement("li");
         li.className = "result-item";
         li.innerHTML = `
-          <div class="result-title">${item.title}</div>
-          <div class="result-snippet">${item.snippet}</div>
+          <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="result-link">
+            <div class="result-title">${escapeHtml(item.title)}</div>
+            <div class="result-snippet">${escapeHtml(item.snippet)}</div>
+          </a>
         `;
         listEl.appendChild(li);
       });
       countEl.textContent = items.length + " artiklar";
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
     }
 
     function setLoading() {
@@ -325,7 +340,7 @@
         if (!res.ok) throw new Error('Fel vid hämtning av resultat');
         const data = await res.json();
         if (data.results.length === 0) {
-          setError('Inga resultat hittades. Wikipedia-integration kommer snart.');
+          setError('Inga resultat hittades för din sökning.');
         } else {
           render(data.results);
         }
