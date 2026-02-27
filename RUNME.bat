@@ -1,30 +1,67 @@
 @echo off
 REM Upsum Project Nexus — Quick Start
+REM Automated setup for Wikipedia-integrated Swedish knowledge platform
+
+echo ===============================================
+echo   Upsum — Project Nexus
+echo   Starting backend and frontend...
+echo ===============================================
+echo.
 
 REM Backend setup
+echo [1/3] Setting up backend...
 cd backend
 if not exist .venv (
+    echo Creating Python virtual environment...
     python -m venv .venv
 )
+echo Activating virtual environment...
 call .venv\Scripts\activate
-pip install -r requirements.txt
-start cmd /k uvicorn main:app --reload --host 0.0.0.0 --port 8000
+echo Installing dependencies (FastAPI, uvicorn, wikipediaapi)...
+pip install -q -r requirements.txt
+
+echo.
+echo [2/3] Starting backend server on http://localhost:8000
+start "Upsum Backend" cmd /k "echo Upsum Backend Server && echo ==================== && echo. && uvicorn main:app --reload --host 0.0.0.0 --port 8000"
 cd ..
 
+REM Wait for backend to start
+echo Waiting for backend to initialize...
+timeout /t 3 /nobreak > nul
+
 REM Frontend setup
+echo.
+echo [3/3] Opening frontend interface...
+
+REM Check if React/Vite frontend exists
 if exist frontend\package.json (
     cd frontend
+    echo Found npm project, installing dependencies...
     call npm install
-    start cmd /k npm run dev
+    start "Upsum Frontend" cmd /k "echo Upsum Frontend Server && echo ==================== && echo. && npm run dev"
     cd ..
+    timeout /t 2 /nobreak > nul
+    start http://localhost:5173
 ) else (
-    echo Frontend directory or package.json not found. Skipping frontend start.
+    REM Use standalone HTML frontend served by backend
+    echo Using standalone HTML frontend served by backend
+    start http://localhost:8000
 )
 
-REM Open frontend in browser
-start http://localhost:5173
+echo.
+echo ===============================================
+echo   Upsum is now running!
+echo ===============================================
+echo   Frontend:  http://localhost:8000
+echo   API Docs:  http://localhost:8000/api/docs
+echo   Health:    http://localhost:8000/health
+echo ===============================================
+echo.
+echo Press any key to open API documentation...
+pause > nul
+start http://localhost:8000/api/docs
 
-REM Open backend docs in browser
-start http://localhost:8000/docs
-
-REM Done
+echo.
+echo Upsum is ready! Close this window when done.
+echo Backend and frontend will continue running in separate windows.
+pause
