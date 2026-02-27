@@ -6,9 +6,12 @@ REM Check for admin privileges and elevate if needed
 net session >nul 2>&1
 if %errorLevel% neq 0 (
     echo Requesting administrator privileges...
-    powershell -Command "Start-Process '%~f0' -Verb RunAs"
+    powershell -Command "Start-Process '%~f0' -Verb RunAs -ArgumentList '%cd%'"
     exit /b
 )
+
+REM Change to script directory (important when running as admin)
+cd /d "%~dp0"
 
 echo ===============================================
 echo   Upsum — Project Nexus
@@ -25,19 +28,25 @@ if not exist .venv (
     python -m venv .venv
 )
 echo Activating virtual environment...
-call .venv\Scripts\activate
+call .venv\Scripts\activate.bat
 echo Installing dependencies (FastAPI, uvicorn, requests)...
 pip install -q -r requirements.txt
 
 echo.
 echo [2/3] Starting backend server on http://0.0.0.0:80
 echo Note: Using port 80 for standard HTTP access (no :8000 needed)
-start "Upsum Backend" cmd /k "echo Upsum Backend Server && echo ==================== && echo Running on port 80 (HTTP) && echo. && uvicorn main:app --reload --host 0.0.0.0 --port 80"
+
+REM Get full path to uvicorn in venv
+set VENV_PATH=%cd%\.venv\Scripts
+set UVICORN=%VENV_PATH%\uvicorn.exe
+
+REM Start backend with full path to uvicorn
+start "Upsum Backend" cmd /k "cd /d "%cd%" && echo Upsum Backend Server && echo ==================== && echo Running on port 80 (HTTP) && echo. && "%UVICORN%" main:app --reload --host 0.0.0.0 --port 80"
 cd ..
 
 REM Wait for backend to start
 echo Waiting for backend to initialize...
-timeout /t 3 /nobreak > nul
+timeout /t 4 /nobreak > nul
 
 REM Frontend setup
 echo.
