@@ -2,9 +2,18 @@
 REM Upsum Project Nexus — Quick Start
 REM Automated setup for Wikipedia-integrated Swedish knowledge platform
 
+REM Check for admin privileges and elevate if needed
+net session >nul 2>&1
+if %errorLevel% neq 0 (
+    echo Requesting administrator privileges...
+    powershell -Command "Start-Process '%~f0' -Verb RunAs"
+    exit /b
+)
+
 echo ===============================================
 echo   Upsum — Project Nexus
 echo   Starting backend and frontend...
+echo   Running as Administrator for port 80 access
 echo ===============================================
 echo.
 
@@ -17,12 +26,13 @@ if not exist .venv (
 )
 echo Activating virtual environment...
 call .venv\Scripts\activate
-echo Installing dependencies (FastAPI, uvicorn, wikipediaapi)...
+echo Installing dependencies (FastAPI, uvicorn, requests)...
 pip install -q -r requirements.txt
 
 echo.
-echo [2/3] Starting backend server on http://localhost:8000
-start "Upsum Backend" cmd /k "echo Upsum Backend Server && echo ==================== && echo. && uvicorn main:app --reload --host 0.0.0.0 --port 8000"
+echo [2/3] Starting backend server on http://0.0.0.0:80
+echo Note: Using port 80 for standard HTTP access (no :8000 needed)
+start "Upsum Backend" cmd /k "echo Upsum Backend Server && echo ==================== && echo Running on port 80 (HTTP) && echo. && uvicorn main:app --reload --host 0.0.0.0 --port 80"
 cd ..
 
 REM Wait for backend to start
@@ -45,21 +55,26 @@ if exist frontend\package.json (
 ) else (
     REM Use standalone HTML frontend served by backend
     echo Using standalone HTML frontend served by backend
-    start http://localhost:8000
+    start http://localhost
 )
 
 echo.
 echo ===============================================
 echo   Upsum is now running!
 echo ===============================================
-echo   Frontend:  http://localhost:8000
-echo   API Docs:  http://localhost:8000/api/docs
-echo   Health:    http://localhost:8000/health
+echo   Frontend:  http://localhost
+echo   Remote:    http://upsum.oscyra.solutions
+echo   Public IP: http://188.149.38.55
+echo   API Docs:  http://localhost/api/docs
+echo   Health:    http://localhost/health
 echo ===============================================
+echo.
+echo Note: Backend running on port 80 (standard HTTP)
+echo This allows access without specifying :8000
 echo.
 echo Press any key to open API documentation...
 pause > nul
-start http://localhost:8000/api/docs
+start http://localhost/api/docs
 
 echo.
 echo Upsum is ready! Close this window when done.
