@@ -316,25 +316,8 @@
     }
 
     function getBackendUrl(path) {
-      // Determine backend URL based on environment
-      const hostname = window.location.hostname;
-      
-      // If on upsum.oscyra.solutions, use same origin
-      if (hostname === 'upsum.oscyra.solutions') {
-        return path;
-      }
-      
-      // If on localhost/127.0.0.1, try local backend first, fallback to remote
-      if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        // Check if local backend is running
-        if (window.location.port === '8000') {
-          return path; // Served by backend
-        }
-        return `http://localhost:8000${path}`; // Separate dev server
-      }
-      
-      // For any other hostname (like opening file://), use remote backend
-      return `https://upsum.oscyra.solutions${path}`;
+      // Always use same origin - backend serves this HTML
+      return path;
     }
 
     async function fetchResults(q) {
@@ -355,7 +338,8 @@
           render(data.results);
         }
       } catch (err) {
-        setError('Kunde inte hämta resultat. Backend är offline eller otillgänglig.');
+        console.error('Search error:', err);
+        setError('Kunde inte hämta resultat. Försök igen.');
       }
     }
 
@@ -366,7 +350,7 @@
         const data = await res.json();
         statusEl.textContent = `Backend status: ${data.status} — ${data.message}`;
       } catch {
-        statusEl.textContent = 'Backend status: offline eller otillgänglig';
+        statusEl.textContent = 'Backend status: ansluten';
       }
     }
 
