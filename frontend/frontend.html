@@ -316,15 +316,25 @@
     }
 
     function getBackendUrl(path) {
-      // Use same origin for deployed site, localhost:8000 for local dev
-      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        return `http://localhost:8000${path}`;
+      // Determine backend URL based on environment
+      const hostname = window.location.hostname;
+      
+      // If on upsum.oscyra.solutions, use same origin
+      if (hostname === 'upsum.oscyra.solutions') {
+        return path;
       }
-      // For deployed site, use /health for health check, otherwise use same origin
-      if (path === '/') {
-        return `/health`;
+      
+      // If on localhost/127.0.0.1, try local backend first, fallback to remote
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        // Check if local backend is running
+        if (window.location.port === '8000') {
+          return path; // Served by backend
+        }
+        return `http://localhost:8000${path}`; // Separate dev server
       }
-      return path;
+      
+      // For any other hostname (like opening file://), use remote backend
+      return `https://upsum.oscyra.solutions${path}`;
     }
 
     async function fetchResults(q) {
@@ -351,7 +361,7 @@
 
     async function checkBackendStatus() {
       try {
-        const res = await fetch(getBackendUrl(`/`));
+        const res = await fetch(getBackendUrl(`/health`));
         if (!res.ok) throw new Error();
         const data = await res.json();
         statusEl.textContent = `Backend status: ${data.status} — ${data.message}`;
